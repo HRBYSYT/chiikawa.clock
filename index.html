@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- iPadのホーム画面に追加した際にフルスクリーンにする設定 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>ちいかわ風 時計</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700&display=swap" rel="stylesheet">
+
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #a8d8ea; 
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+        }
+
+        /* 自作動画を無限ループの背景にする設定 */
+        .background-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* 画面いっぱいに広げる */
+            z-index: 1;
+        }
+
+        /* デジタル時計のデザインと配置 */
+        .clock-container {
+            position: absolute;
+            top: 40%; /* 下のキャラクターを隠さないよう少し上に配置 */
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.7); 
+            padding: 30px 60px;
+            border-radius: 40px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        .time {
+            font-size: 15vw; 
+            color: #555;
+            line-height: 1;
+            text-shadow: 2px 2px 4px #fff;
+        }
+
+        /* 1時間ごとのキャラクターアニメーション用 */
+        .character-action {
+            position: absolute;
+            bottom: -300px; 
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 300px;
+            background-image: url('character.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            z-index: 20;
+            transition: bottom 1s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+        }
+
+        .character-action.active {
+            bottom: 50px; 
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 背景動画（autoplay, loop, muted, playsinline がiPadでの自動再生に必須） -->
+    <video class="background-video" src="background.mp4" autoplay loop muted playsinline></video>
+
+    <!-- 時計表示 -->
+    <div class="clock-container">
+        <div class="time" id="clock">00:00:00</div>
+    </div>
+
+    <!-- 1時間ごとのキャラクター -->
+    <div class="character-action" id="character"></div>
+
+    <script>
+        let timeOffset = 0; 
+        let lastHour = -1;
+
+        // NICTの時刻を取得
+        async function syncNICTTime() {
+            try {
+                const startTime = Date.now();
+                const response = await fetch('https://ntp-a1.nict.go.jp/cgi-bin/json');
+                const data = await response.json();
+                const endTime = Date.now();
+
+                const latency = (endTime - startTime) / 2;
+                const nictTime = data.st * 1000; 
+
+                timeOffset = (nictTime + latency) - Date.now();
+            } catch (error) {
+                console.error("NICT同期エラー:", error);
+            }
+        }
+
+        // 時計の更新ループ
+        function updateClock() {
+            const now = new Date(Date.now() + timeOffset);
+            
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            const seconds = now.getSeconds().toString().padStart(2, '0');
+
+            document.getElementById('clock').innerText = `${hours}:${minutes}:${seconds}`;
+
+            if (lastHour !== -1 && lastHour !== now.getHours()) {
+                triggerHourlyAnimation();
+                syncNICTTime(); 
+            }
+            lastHour = now.getHours();
+
+            requestAnimationFrame(updateClock);
+        }
+
+        // キャラクター演出
+        function triggerHourlyAnimation() {
+            const chara = document.getElementById('character');
+            chara.classList.add('active'); 
+            setTimeout(() => {
+                chara.classList.remove('active');
+            }, 10000); 
+        }
+
+        async function init() {
+            await syncNICTTime(); 
+            updateClock();        
+        }
+
+        init();
+    </script>
+</body>
+</html>
